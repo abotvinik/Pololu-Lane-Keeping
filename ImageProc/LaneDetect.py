@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 import cv2
+import sys
 
-cap = cv2.VideoCapture(0)
+#cap = cv2.VideoCapture(0)
 
 def picam_load():
     ret, frame = cap.read()
@@ -40,7 +41,7 @@ def image_processor(image):
     # since we are getting too many edges from our image, we apply 
     # a mask polygon to only focus on the road
     # Will explain Region selection in detail in further steps
-    region = region_selection(edges)
+    region = edges #region_selection(edges)
     
     return region
 
@@ -76,12 +77,30 @@ def region_selection(image):
     return masked_image
 
 def lr_detector(proc_img):
+    shape = proc_img.shape
+    middle = int(shape[1] / 2)
+    countLeft = 0
     left = 0
-    right = 1024
-    return left, right
+    countRight = 0
+    right = 0
+    for i in range(800, 900):
+        for j in range(0, middle):
+            if proc_img[i][j] == 255:
+                countLeft += 1
+                left += j
+        for j in range(middle, shape[1]):
+            if proc_img[i][j] == 255:
+                countRight += 1
+                right += j
+    avgLeft = left / countLeft
+    avgRight = right / countRight
+    return avgLeft, avgRight
 
 if __name__ == '__main__':
-    image = image_file('./')
+    image = image_file('./test.jpg')
     proc_img = image_processor(image)
+    print(proc_img.shape)
+    cv2.imwrite('test_proc.jpg', proc_img)
     left, right = lr_detector(proc_img)
+    print(left, right)
 
