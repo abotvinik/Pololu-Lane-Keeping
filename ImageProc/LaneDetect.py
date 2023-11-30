@@ -1,14 +1,20 @@
 import numpy as np
-import pandas as pd
+from picamera2 import Picamera2
+import time
 import cv2
 import sys
 
-#cap = cv2.VideoCapture(0)
+camera = Picamera2()
+camera_config = camera.create_still_configuration(main={"size": (1920, 1080)}, lores={"size": (640, 480)}, display="lores")
+camera.configure(camera_config)
+camera.start()
 
 def picam_load():
-    ret, frame = cap.read()
-    #cv2.imwrite('image.jpg', frame)
-    image_processor(frame)
+    time.sleep(0.1)
+    im = camera.capture_array()
+    cv2.imwrite("test.jpg", im)
+    left, right = lr_detector(image_processor(im))
+    print(left, right)
 
 def image_file(filename):
     image = cv2.imread(filename)
@@ -37,6 +43,8 @@ def image_processor(image):
     high_t = 150
     # applying canny edge detection and save edges in a variable
     edges = cv2.Canny(blur, low_t, high_t)
+
+    cv2.imwrite("edges.jpg", edges)
     
     # since we are getting too many edges from our image, we apply 
     # a mask polygon to only focus on the road
@@ -97,10 +105,12 @@ def lr_detector(proc_img):
     return avgLeft, avgRight
 
 if __name__ == '__main__':
-    image = image_file('./test.jpg')
-    proc_img = image_processor(image)
-    print(proc_img.shape)
-    cv2.imwrite('test_proc.jpg', proc_img)
-    left, right = lr_detector(proc_img)
-    print(left, right)
+    # image = image_file('./test.jpg')
+    # proc_img = image_processor(image)
+    # print(proc_img.shape)
+    # cv2.imwrite('test_proc.jpg', proc_img)
+    # left, right = lr_detector(proc_img)
+    # print(left, right)
+
+    picam_load()
 
