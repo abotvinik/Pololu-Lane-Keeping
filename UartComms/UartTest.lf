@@ -1,0 +1,80 @@
+target C {
+    platform: "RP2040",
+    threading: false,
+ }
+ import Accelerometer from "lib/IMU.lf"
+ import Display from "lib/Display.lf"
+ preamble {=
+    #include <pico/stdlib.h>
+    #include <imu.h>
+    //uart imports
+    #include <stdio.h>
+    #include "pico/stdlib.h"
+    #include "hardware/uart.h"
+    #include <hardware/gpio.h>
+    //
+    #define UART_ID uart0
+    #define BAUD_RATE 115200
+    #define UART_TX_PIN 28
+    #define UART_RX_PIN 29
+    #define MAX_STRING_LENGTH 256
+ =}
+ main reactor {
+    a = new Accelerometer()
+    d = new Display()
+    timer t(0, 1 sec)
+    //code on startup
+    state led_on:bool = false;
+    reaction(startup) {=
+        stdio_init_all();
+ 
+ 
+ 
+ 
+        //led stuff
+        gpio_init(PICO_DEFAULT_LED_PIN);
+        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+ 
+ 
+        //uart stuff
+ 
+ 
+ 
+ 
+        uart_init(UART_ID, BAUD_RATE);
+        gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+        gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+        uart_set_format(UART_ID, 8,1,UART_PARITY_NONE);
+ 
+ 
+ 
+ 
+ 
+ 
+        // self->led_on = !self->led_on;
+        // printf("LED State: %b\n", self->led_on);
+        // gpio_put(PICO_DEFAULT_LED_PIN, !self->led_on);
+        // sleep_ms(100);
+      
+    =}
+    reaction(t) -> d.line0 {=
+        char buffer[256];
+        int i = 0;
+ 
+ 
+        while(1) {
+            char c = uart_getc(UART_ID);
+            if (c=='\n') {
+                buffer[i] = '\0';
+                break;
+            }
+            buffer[i++] = c;
+            if (i >= sizeof(buffer)-1) {
+                buffer[i] = '\0';
+                break;
+            }
+        }
+        lf_set(d.line0,buffer);
+    =}
+ }
+ 
