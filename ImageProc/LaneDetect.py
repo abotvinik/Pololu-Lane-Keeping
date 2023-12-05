@@ -1,13 +1,29 @@
+import serial
 import numpy as np
 from picamera2 import Picamera2
 import time
 import cv2
 import sys
 
+ser = serial.Serial(
+   port='/dev/ttyAMA0',  # Use the primary UART port on Raspberry Pi 4
+   baudrate=115200,       # Set the baud rate
+   timeout=1            # Set a timeout value (in seconds) for read operations
+)
+
 camera = Picamera2()
 camera_config = camera.create_still_configuration(main={"size": (1920, 1080)}, lores={"size": (640, 480)}, display="lores")
 camera.configure(camera_config)
 camera.start()
+
+def send_to_uart(left, right):
+    left = int(left)
+    right = int(right)
+    print(hex(left), hex(right))
+
+    num = (left << 16) & right
+    print(hex(num))
+
 
 def picam_load():
     time.sleep(0.1)
@@ -102,7 +118,9 @@ def lr_detector(proc_img):
                 right += j
     avgLeft = left / countLeft
     avgRight = right / countRight
+    send_to_uart(avgLeft, avgRight)
     return avgLeft, avgRight
+
 
 if __name__ == '__main__':
     # image = image_file('./test.jpg')
@@ -112,5 +130,7 @@ if __name__ == '__main__':
     # left, right = lr_detector(proc_img)
     # print(left, right)
 
-    picam_load()
+    #picam_load()
+    left, right = lr_detector(image_file('./edges.jpg'))
+    ser.close()
 
