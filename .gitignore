@@ -1,2 +1,8 @@
 *.jpg
 *:Zone.Identifier
+*include/*
+*src-gen/*
+*bin/*
+*/include/*
+*/src-gen/*
+*/bin/*
