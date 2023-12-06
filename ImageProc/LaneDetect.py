@@ -5,18 +5,29 @@ import time
 import cv2
 import sys
 
+print("Initializing Serial Port")
 ser = serial.Serial(
    port='/dev/ttyAMA0',  # Use the primary UART port on Raspberry Pi 4
    baudrate=115200,       # Set the baud rate
    timeout=1            # Set a timeout value (in seconds) for read operations
 )
 
+print("Initializing Camera")
 camera = Picamera2()
 camera_config = camera.create_still_configuration(main={"size": (1920, 1080)}, lores={"size": (640, 480)}, display="lores")
 camera.configure(camera_config)
 camera.start()
+time.sleep(2)
+print("Camera Ready")
 
 def send_to_uart(left, right):
+    """
+    Send the left and right lane line coordinates over the UART Serial Connection.
+    Sends it in the form of a single 4 byte integer, where the left lane line is the first 16 bits and the right lane line is the last 16 bits.
+    Parameters:
+        left: x coordinate of the left lane line
+        right: x coordinate of the right lane line
+    """
     left = int(left)
     right = int(right)
     print(left, right)
@@ -30,12 +41,19 @@ def send_to_uart(left, right):
     ser.write(msg.encode('utf-8'))
 
 
-def picam_load():
-    time.sleep(1)
-    im = camera.capture_array()
-    cv2.imwrite("test.jpg", im)
-    left, right = lr_detector(image_processor(im))
-    print(left, right)
+def cam_loop():
+    """
+    Continuously capture images from the camera and send the left and right lane line coordinates over the UART Serial Connection.
+    """
+    while True:
+        try:
+            im = camera.capture_array()
+            # cv2.imwrite("test.jpg", im)
+            left, right = lr_detector(image_processor(im))
+            print(left, right)
+            send_to_uart(left, right)
+        except KeyboardInterrupt:
+            break
 
 def image_file(filename):
     print('start')
@@ -115,7 +133,7 @@ def lr_detector(proc_img):
     countRight = 0
     right = 0
     print('start')
-    for i in range(800, 810):
+    for i in range(890, 910):
         for j in range(0, middle):
             if proc_img[i][j] == 255:
                 countLeft += 1
@@ -127,7 +145,6 @@ def lr_detector(proc_img):
     print('end')
     avgLeft = (left / countLeft if countLeft != 0 else 0)
     avgRight = (right / countRight if countRight != 0 else 1920)
-    send_to_uart(avgLeft, avgRight)
     return avgLeft, avgRight
 
 
@@ -139,8 +156,9 @@ if __name__ == '__main__':
     # left, right = lr_detector(proc_img)
     # print(left, right)
 
-    picam_load()
     # left, right = lr_detector(image_file('./edges.jpg'))
     # time.sleep(1)
+
+    cam_loop()
     ser.close()
 
