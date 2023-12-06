@@ -58,7 +58,7 @@ target C {
       
     =}
     reaction(t) -> d.line0 {=
-        char buffer[256];
+        char buffer[20];
         int i = 0;
  
  

@@ -19,21 +19,28 @@ camera.start()
 def send_to_uart(left, right):
     left = int(left)
     right = int(right)
+    print(left, right)
     print(hex(left), hex(right))
 
-    num = (left << 16) & right
+    num = (left << 16) | right
+    print(num)
     print(hex(num))
+    msg = f'{num}\n'
+    print(msg)
+    ser.write(msg.encode('utf-8'))
 
 
 def picam_load():
-    time.sleep(0.1)
+    time.sleep(1)
     im = camera.capture_array()
     cv2.imwrite("test.jpg", im)
     left, right = lr_detector(image_processor(im))
     print(left, right)
 
 def image_file(filename):
+    print('start')
     image = cv2.imread(filename)
+    print('end')
     return image
 
 def image_processor(image):
@@ -107,7 +114,8 @@ def lr_detector(proc_img):
     left = 0
     countRight = 0
     right = 0
-    for i in range(800, 900):
+    print('start')
+    for i in range(800, 810):
         for j in range(0, middle):
             if proc_img[i][j] == 255:
                 countLeft += 1
@@ -116,8 +124,9 @@ def lr_detector(proc_img):
             if proc_img[i][j] == 255:
                 countRight += 1
                 right += j
-    avgLeft = left / countLeft
-    avgRight = right / countRight
+    print('end')
+    avgLeft = (left / countLeft if countLeft != 0 else 0)
+    avgRight = (right / countRight if countRight != 0 else 1920)
     send_to_uart(avgLeft, avgRight)
     return avgLeft, avgRight
 
@@ -130,7 +139,8 @@ if __name__ == '__main__':
     # left, right = lr_detector(proc_img)
     # print(left, right)
 
-    #picam_load()
-    left, right = lr_detector(image_file('./edges.jpg'))
+    picam_load()
+    # left, right = lr_detector(image_file('./edges.jpg'))
+    # time.sleep(1)
     ser.close()
 
