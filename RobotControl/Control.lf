@@ -7,7 +7,7 @@ target C {
 }
 
 import Motors from "../lib/Motors.lf"
-// import Display from "../lib/Display.lf"
+import Display from "../lib/Display.lf"
 //import Encoders from "../lib/Encoders.lf"
 //import GyroAngle from "../lib/IMU.lf"
 //import Accelerometer from "../lib/IMU.lf"
@@ -28,27 +28,27 @@ preamble {=
     #define MAX_STRING_LENGTH 256
 
     //Lane Value Defines
-    #define LEFT_CENTER 200
-    #define RIGHT_CENTER 1700
+    #define LEFT_CENTER 145
+    #define RIGHT_CENTER 1830
     #define THRESH 20
 
     //Lane Check Functions
-    int isLeftCenter(int left) {
-        return left <= LEFT_CENTER + THRESH && left => LEFT_CENTER - THRESH;
+    static int isLeftCenter(int left) {
+        return left <= LEFT_CENTER + THRESH && left >= LEFT_CENTER - THRESH;
     }
-    int isRightCenter(int right) {
-        return right <= RIGHT_CENTER + THRESH && right => RIGHT_CENTER - THRESH;
+    static int isRightCenter(int right) {
+        return right <= RIGHT_CENTER + THRESH && right >= RIGHT_CENTER - THRESH;
     }
-    int isLeftTurnLeft(int left) {
+    static int isLeftTurnLeft(int left) {
         return left < LEFT_CENTER - THRESH;
     }
-    int isRightTurnLeft(int right) {
+    static int isRightTurnLeft(int right) {
         return right < RIGHT_CENTER - THRESH;
     }
-    int isLeftTurnRight(int left) {
+    static int isLeftTurnRight(int left) {
         return left > LEFT_CENTER + THRESH;
     }
-    int isRightTurnRight(int right) {
+    static int isRightTurnRight(int right) {
         return right > RIGHT_CENTER + THRESH;
     }
 
@@ -60,18 +60,26 @@ reactor lanesFromInt {
     output right: int
 
     reaction(encodedLanes) -> left, right {=
-        lf_set(left, encodedLanes & 0xFFFF0000 >> 16)
-        lf_set(right, encodedLanes & 0x0000FFFF)
+        lf_set(left, encodedLanes->value & 0xFFFF0000 >> 16);
+        lf_set(right, encodedLanes->value & 0x0000FFFF);
     =}
 }
 
 main reactor {
     m = new Motors()
+    d = new Display()
     lane = new lanesFromInt()
     timer uart_poll(0, 250 ms)
 
-    reaction(startup) -> lane.encodedLanes {=
+    reaction(startup) -> lane.encodedLanes, d.line3 {=
+        static char buf[17];
+        snprintf(buf, 17, "Enter Setup");
+        lf_set(d.line3, buf);
         stdio_init_all();
+
+        //Status LED Init
+        gpio_init(PICO_DEFAULT_LED_PIN);
+        gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
         
         //UART Init
         uart_init(UART_ID, BAUD_RATE);
@@ -81,11 +89,37 @@ main reactor {
 
         //Lane Init
         lf_set(lane.encodedLanes, 1920);
+        snprintf(buf, 17, "Finish Setup");
+        lf_set(d.line3, buf);
     =}
 
-    reaction(uart_poll) -> lane.encodedLanes {=
+    // reaction(uart_poll) -> d.line0 {=
+    //     char buffer[20];
+    //     int i = 0;
+
+
+    //     while(1) {
+    //         char c = uart_getc(UART_ID);
+    //         if (c=='\n') {
+    //             buffer[i] = '\0';
+    //             break;
+    //         }
+    //         buffer[i++] = c;
+    //         if (i >= sizeof(buffer)-1) {
+    //             buffer[i] = '\0';
+    //             break;
+    //         }
+    //     }
+    //     lf_set(d.line0,buffer);
+    // =}
+
+    reaction(uart_poll) -> lane.encodedLanes, d.line0, d.line1 {=
         char buffer[20];
         int i = 0;
+
+        static char buf1[17];
+        snprintf(buf1, 17, "Start UART Load");
+        lf_set(d.line1, buf1);
  
         while(1) {
             char c = uart_getc(UART_ID);
@@ -100,36 +134,41 @@ main reactor {
             }
         }
         int lanes = atoi(buffer);
+        static char buf[17];
+        snprintf(buf, 17, "%d %d", lanes & 0xFFFF0000 >> 16, lanes & 0x0000FFFF);
+        lf_set(d.line0, buf);
         lf_set(lane.encodedLanes, lanes);
     =}
 
     initial mode Standby {
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Straight, Left, Right {=
-            if(isLeftCenter(lane.left) && isRightCenter(lane.right)) {
-                lf_set_mode(Straight);
-            } 
-            if(isLeftTurnLeft(lane.left) && isRightTurnLeft(lane.right)) {
-                lf_set_mode(Left);
-            }
-            if(isLeftTurnRight(lane.left) && isRightTurnRight(lane.right)) {
-                lf_set_mode(Right);
-            }
+            // if(isLeftCenter(lane.left) && isRightCenter(lane.right)) {
+            //     lf_set(m.left_power, 0.2f);
+            //     lf_set(m.right_power, 0.2f);
+            //     lf_set_mode(Straight);
+            // } 
+            // if(isLeftTurnLeft(lane.left) && isRightTurnLeft(lane.right)) {
+            //     lf_set_mode(Left);
+            // }
+            // if(isLeftTurnRight(lane.left) && isRightTurnRight(lane.right)) {
+            //     lf_set_mode(Right);
+            // }
         =}
     }
 
     mode Straight {
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Left, Right, mergeLeft, mergeRight, Standby {= 
             if(isLeftTurnLeft(lane.left) && isRightTurnLeft(lane.right)) {
-                lf_set_mode(Left);
+                lf_set_mode(Standby);
             }
             if(isLeftTurnRight(lane.left) && isRightTurnRight(lane.right)) {
-                lf_set_mode(Right);
+                lf_set_mode(Standby);
             }
             if(isLeftCenter(lane.left) && isRightTurnLeft(lane.right)) {
-                lf_set_mode(mergeLeft);
+                lf_set_mode(Standby);
             }
             if(isLeftTurnRight(lane.left) && isRightCenter(lane.right)) {
-                lf_set_mode(mergeRight);
+                lf_set_mode(Standby);
             }
             if(lane.left == 0 && lane.right == 1920) {
                 lf_set_mode(Standby);
