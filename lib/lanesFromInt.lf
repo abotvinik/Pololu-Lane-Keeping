@@ -1,0 +1,31 @@
+target C {
+    platform: {
+      name: "rp2040",
+      board: "pololu_3pi_2040_robot"
+    },
+    threading: false,
+}
+
+import Display from "../lib/Display.lf"
+
+
+reactor lanesFromInt {
+    input encodedLanes: int
+    output left: int
+    output right: int
+    d = new Display()
+
+    reaction(encodedLanes) -> left, right, d.line0 {=
+        printf("Decoding Lane\n");
+        printf("%d\n", encodedLanes->value);
+        int extractLeft = (encodedLanes->value) >> 16;
+        int extractRight = (encodedLanes->value) & 0x0000FFFF;
+        lf_set(left, (encodedLanes->value) >> 16);
+        lf_set(right, (encodedLanes->value) & 0x0000FFFF);
+        printf("Decoded: %d %d\n", extractLeft, extractRight);
+        printf("Outputs Set: %d %d\n", left->value, right->value);
+        static char buf[17];
+        snprintf(buf, 17, "%d %d", extractLeft, extractRight);
+        lf_set(d.line0, buf);
+    =}
+}
