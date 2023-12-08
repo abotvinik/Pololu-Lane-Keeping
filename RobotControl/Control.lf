@@ -16,6 +16,7 @@ import lanesFromInt from "../lib/lanesFromInt.lf"
 preamble {=
     #include <pico/stdlib.h>
     #include <imu.h>
+    #include "pico/time.h"
     //uart imports
     #include <stdio.h>
     #include "pico/stdlib.h"
@@ -31,7 +32,7 @@ preamble {=
     //Lane Value Defines
     #define LEFT_CENTER 165
     #define RIGHT_CENTER 1745
-    #define THRESH 30
+    #define THRESH 150
 
     //Lane Check Functions
     static int isLeftCenter(int left) {
@@ -112,11 +113,13 @@ main reactor {
             printf("Entering Standby\n");
             printf("Lane Values %d %d\n", lane.left->value, lane.right->value);
             if(isLeftCenter(lane.left->value) && isRightCenter(lane.right->value)) {
-                lf_set(m.left_power, 0.2f);
-                lf_set(m.right_power, 0.2f);
+                lf_set(m.left_power, 0.16f);
+                lf_set(m.right_power, 0.15f);
                 lf_set_mode(Straight);
             } 
             if(isLeftTurnLeft(lane.left->value) && isRightTurnLeft(lane.right->value)) {
+                lf_set(m.left_power, 0.0f);
+                lf_set(m.right_power, 0.0f);
                 lf_set_mode(Standby);
             }
             if(isLeftTurnRight(lane.left->value) && isRightTurnRight(lane.right->value)) {
@@ -129,19 +132,29 @@ main reactor {
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Left, Right, mergeLeft, mergeRight, Standby {= 
             printf("Entering Straight\n");
             if(isLeftTurnLeft(lane.left->value) && isRightTurnLeft(lane.right->value)) {
+                lf_set(m.left_power, 0.0f);
+                lf_set(m.right_power, 0.0f);
                 lf_set_mode(Standby);
-            }
+           }
             if(isLeftTurnRight(lane.left->value) && isRightTurnRight(lane.right->value)) {
-                lf_set_mode(Standby);
+                lf_set(m.left_power, 0.0f);
+                lf_set(m.right_power, 0.0f);
+                lf_set_mode(Standby);                
             }
             if(isLeftCenter(lane.left->value) && isRightTurnLeft(lane.right->value)) {
-                lf_set_mode(Standby);
+                lf_set(m.left_power, 0.1f);
+                lf_set(m.right_power, 0.15f);
+                lf_set_mode(mergeLeft);                
             }
             if(isLeftTurnRight(lane.left->value) && isRightCenter(lane.right->value)) {
-                lf_set_mode(Standby);
+                lf_set(m.left_power, 0.0f);
+                lf_set(m.right_power, 0.0f);
+                lf_set_mode(Standby);                
             }
             if(lane.left->value == 0 && lane.right->value == 1920) {
-                lf_set_mode(Standby);
+                lf_set(m.left_power, 0.0f);
+                lf_set(m.right_power, 0.0f);
+                lf_set_mode(Standby);                
             }
         =}
     }
@@ -191,6 +204,15 @@ main reactor {
     mode mergeLeft {
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Standby {=
             printf("Entering Merge Left\n");
+            sleep_ms(500);
+            lf_set(m.left_power, 0.16f);
+            lf_set(m.right_power, 0.15f);
+            sleep_ms(1000);
+            lf_set(m.left_power, 0.15f);
+            lf_set(m.right_power, 0.1f);
+            sleep_ms(500);
+            lf_set(m.left_power, 0.0f);
+            lf_set(m.right_power, 0.0f);
             lf_set_mode(Standby);
         =}
     }
