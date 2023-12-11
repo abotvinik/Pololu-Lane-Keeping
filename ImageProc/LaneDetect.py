@@ -5,6 +5,9 @@ import time
 import cv2
 import sys
 
+lane = 380
+threshold = 10
+
 print("Initializing Serial Port")
 ser = serial.Serial(
    port='/dev/ttyAMA0',  # Use the primary UART port on Raspberry Pi 4
@@ -14,7 +17,7 @@ ser = serial.Serial(
 
 print("Initializing Camera")
 camera = Picamera2()
-camera_config = camera.create_still_configuration(main={"size": (1920, 1080)}, lores={"size": (640, 480)}, display="lores")
+camera_config = camera.create_still_configuration(main={"size": (640, 480)}, display="main")
 camera.configure(camera_config)
 camera.start()
 time.sleep(2)
@@ -31,15 +34,23 @@ def send_to_uart(left, right):
     left = int(left)
     right = int(right)
     print(left, right)
-    print(hex(left), hex(right))
 
     num = (left << 16) | right
     print(num)
-    print(hex(num))
     msg = f'{num}\n'
     print(msg)
+    print(f'Extracted:{1} {2}', num >> 16, num & 0x0000FFFF)
     ser.write(msg.encode('utf-8'))
 
+def single_cam():
+    """
+    Test function to capture a single image
+    """
+    im = camera.capture_array()
+    cv2.imwrite("test.jpg", im)
+    left, right = lr_detector(image_processor(im))
+    print(left, right)
+    send_to_uart(left, right)
 
 def cam_loop():
     """
@@ -48,11 +59,12 @@ def cam_loop():
     while True:
         try:
             im = camera.capture_array()
-            # cv2.imwrite("test.jpg", im)
             left, right = lr_detector(image_processor(im))
             print(left, right)
             send_to_uart(left, right)
         except KeyboardInterrupt:
+            print("Camera Input Stopped")
+            send_to_uart(0, 640) # Signal for Pololu to move to "Ready State"
             break
 
 def image_file(filename):
@@ -81,49 +93,15 @@ def image_processor(image):
     # first threshold for the hysteresis procedure
     low_t = 50
     # second threshold for the hysteresis procedure 
-    high_t = 150
+    high_t = 200
     # applying canny edge detection and save edges in a variable
     edges = cv2.Canny(blur, low_t, high_t)
 
     cv2.imwrite("edges.jpg", edges)
     
-    # since we are getting too many edges from our image, we apply 
-    # a mask polygon to only focus on the road
-    # Will explain Region selection in detail in further steps
-    region = edges #region_selection(edges)
+    region = edges
     
     return region
-
-def region_selection(image):
-    """
-    Determine and cut the region of interest in the input image.
-    Parameters:
-        image: we pass here the output from canny where we have 
-        identified edges in the frame
-    """
-    # create an array of the same size as of the input image 
-    mask = np.zeros_like(image)   
-    # if you pass an image with more then one channel
-    if len(image.shape) > 2:
-        channel_count = image.shape[2]
-        ignore_mask_color = (255,) * channel_count
-    # our image only has one channel so it will go under "else"
-    else:
-          # color of the mask polygon (white)
-        ignore_mask_color = 255
-    # creating a polygon to focus only on the road in the picture
-    # we have created this polygon in accordance to how the camera was placed
-    rows, cols = image.shape[:2]
-    bottom_left  = [cols * 0.1, rows * 0.95]
-    top_left     = [cols * 0.4, rows * 0.6]
-    bottom_right = [cols * 0.9, rows * 0.95]
-    top_right    = [cols * 0.6, rows * 0.6]
-    vertices = np.array([[bottom_left, top_left, top_right, bottom_right]], dtype=np.int32)
-    # filling the polygon with white color and generating the final mask
-    cv2.fillPoly(mask, vertices, ignore_mask_color)
-    # performing Bitwise AND on the input image and mask to get only the edges on the road
-    masked_image = cv2.bitwise_and(image, mask)
-    return masked_image
 
 def lr_detector(proc_img):
     shape = proc_img.shape
@@ -133,7 +111,7 @@ def lr_detector(proc_img):
     countRight = 0
     right = 0
     print('start')
-    for i in range(890, 910):
+    for i in range((lane - threshold), (lane + threshold)):
         for j in range(0, middle):
             if proc_img[i][j] == 255:
                 countLeft += 1
@@ -144,7 +122,7 @@ def lr_detector(proc_img):
                 right += j
     print('end')
     avgLeft = (left / countLeft if countLeft != 0 else 0)
-    avgRight = (right / countRight if countRight != 0 else 1920)
+    avgRight = (right / countRight if countRight != 0 else 640)
     return avgLeft, avgRight
 
 
@@ -158,6 +136,8 @@ if __name__ == '__main__':
 
     # left, right = lr_detector(image_file('./edges.jpg'))
     # time.sleep(1)
+
+    #single_cam()
 
     cam_loop()
     ser.close()
