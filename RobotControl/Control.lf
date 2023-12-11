@@ -30,9 +30,11 @@ preamble {=
     #define MAX_STRING_LENGTH 256
 
     //Lane Value Defines
-    #define LEFT_CENTER 165
-    #define RIGHT_CENTER 1745
-    #define THRESH 150
+    #define LEFT_CENTER 83
+    #define RIGHT_CENTER 553
+    #define THRESH 50
+    #define MIN 0
+    #define MAX 640
 
     //Lane Check Functions
     static int isLeftCenter(int left) {
@@ -45,7 +47,7 @@ preamble {=
         return left < LEFT_CENTER - THRESH;
     }
     static int isRightTurnLeft(int right) {
-        return right < RIGHT_CENTER - THRESH - 50;
+        return right < RIGHT_CENTER - THRESH;
     }
     static int isLeftTurnRight(int left) {
         return left > LEFT_CENTER + THRESH;
@@ -63,7 +65,7 @@ main reactor {
     m = new Motors()
     d = new Display()
     lane = new lanesFromInt()
-    timer uart_poll(0, 250 ms)
+    timer uart_poll(0, 100 ms)
     timer poll(0, 1 ms)
 
     reaction(startup) -> lane.encodedLanes, d.line3 {=
@@ -83,7 +85,7 @@ main reactor {
         uart_set_format(UART_ID, 8, 1, UART_PARITY_NONE);
 
         //Lane Init
-        lf_set(lane.encodedLanes, 1920);
+        lf_set(lane.encodedLanes, 640);
         snprintf(buf, 17, "Finish Setup");
         lf_set(d.line3, buf);
     =}
@@ -116,46 +118,60 @@ main reactor {
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Standby, Straight, Left, Right {=
             printf("Entering Standby\n");
             printf("Lane Values %d %d\n", lane.left->value, lane.right->value);
-            if(isLeftCenter(lane.left->value) && isRightCenter(lane.right->value)) {
+            if(lane.left->value != MIN || lane.right->value != MAX) {
                 lf_set(m.left_power, 0.16f);
                 lf_set(m.right_power, 0.15f);
                 lf_set_mode(Straight);
-            } 
-            if(isLeftTurnLeft(lane.left->value) && isRightTurnLeft(lane.right->value)) {
-                lf_set(m.left_power, 0.0f);
-                lf_set(m.right_power, 0.0f);
-                lf_set_mode(Standby);
             }
-            if(isLeftTurnRight(lane.left->value) && isRightTurnRight(lane.right->value)) {
-                lf_set_mode(Standby);
-            }
+            // if(isLeftCenter(lane.left->value) && isRightCenter(lane.right->value)) {
+            //     lf_set(m.left_power, 0.16f);
+            //     lf_set(m.right_power, 0.15f);
+            //     lf_set_mode(Straight);
+            // } 
+            // if(isLeftTurnLeft(lane.left->value) && isRightTurnLeft(lane.right->value)) {
+            //     lf_set(m.left_power, 0.0f);
+            //     lf_set(m.right_power, 0.0f);
+            //     lf_set_mode(Standby);
+            // }
+            // if(isLeftTurnRight(lane.left->value) && isRightTurnRight(lane.right->value)) {
+            //     lf_set_mode(Standby);
+            // }
         =}
     }
 
     mode Straight {
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Left, Right, mergeLeft1, mergeRight1, Standby {= 
             printf("Entering Straight\n");
-            if(isLeftTurnLeft(lane.left->value) && isRightTurnLeft(lane.right->value)) {
-                lf_set(m.left_power, 0.0f);
-                lf_set(m.right_power, 0.0f);
-                lf_set_mode(Standby);
-           }
-            if(isLeftTurnRight(lane.left->value) && isRightTurnRight(lane.right->value)) {
-                lf_set(m.left_power, 0.0f);
-                lf_set(m.right_power, 0.0f);
-                lf_set_mode(Standby);                
+            int laneAvg = (lane.left->value + lane.right->value) / 2;
+            float leftOff = 0.02 * (laneAvg - 320) / 100;
+            float rightOff = 0.02 * (320 - laneAvg) / 100;
+            lf_set(m.left_power, 0.16f + leftOff);
+            lf_set(m.right_power, 0.15f + rightOff);
+            // Left Turn
+            if(lane.left->value == MIN) {
+                lf_set(m.left_power, 0.12f - (0.06 * ((RIGHT_CENTER - lane.right->value) / 100)));
+                lf_set(m.right_power, 0.11f + (0.04 * ((RIGHT_CENTER - lane.right->value) / 100)));
+                lf_set_mode(Left);
             }
-            if(isLeftCenter(lane.left->value) && isRightTurnLeft(lane.right->value)) {
-                lf_set(m.left_power, 0.0f);
-                lf_set(m.right_power, 0.17f);
-                lf_set_mode(mergeLeft1);                
+
+            // if(isLeftCenter(lane.left->value) && isRightTurnLeft(lane.right->value)) {
+            //     lf_set(m.left_power, 0.0f);
+            //     lf_set(m.right_power, 0.17f);
+            //     lf_set_mode(mergeLeft1);                
+            // }
+
+            //Right Turn
+            if(lane.right->value == MAX) {
+                lf_set(m.left_power, 0.12f + (0.04 * ((lane.left->value - LEFT_CENTER) / 100)));
+                lf_set(m.right_power, 0.11f - (0.06 * ((lane.left->value - LEFT_CENTER) / 100)));
+                lf_set_mode(Right);                
             }
-            if(isLeftTurnRight(lane.left->value) && isRightCenter(lane.right->value)) {
-                lf_set(m.left_power, 0.17f);
-                lf_set(m.right_power, 0.0f);
-                lf_set_mode(mergeRight1);                
-            }
-            if(lane.left->value == 0 && lane.right->value == 1920) {
+            // if(isLeftTurnRight(lane.left->value) && isRightCenter(lane.right->value)) {
+            //     lf_set(m.left_power, 0.17f);
+            //     lf_set(m.right_power, 0.0f);
+            //     lf_set_mode(mergeRight1);                
+            // }
+            if(lane.left->value == MIN && lane.right->value == MAX) {
                 lf_set(m.left_power, 0.0f);
                 lf_set(m.right_power, 0.0f);
                 lf_set_mode(Standby);                
@@ -166,19 +182,27 @@ main reactor {
     mode Left {
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Straight, Right, mergeLeft1, mergeRight1, Standby {= 
             printf("Entering Left\n");
-            if(isLeftCenter(lane.left->value) && isRightCenter(lane.right->value)) {
+            lf_set(m.left_power, 0.12f - (0.06 * ((RIGHT_CENTER - lane.right->value) / 100)));
+            lf_set(m.right_power, 0.11f + (0.04 * ((RIGHT_CENTER - lane.right->value) / 100)));
+            if(isLeftCenter(lane.left->value)) {
+                lf_set(m.left_power, 0.16f);
+                lf_set(m.right_power, 0.15f);
                 lf_set_mode(Straight);
             } 
-            if(isLeftTurnRight(lane.left->value) && isRightTurnRight(lane.right->value)) {
-                lf_set_mode(Right);
+            if(lane.right->value == MAX) {
+                lf_set(m.left_power, 0.12f + (0.04 * ((lane.left->value - LEFT_CENTER) / 100)));
+                lf_set(m.right_power, 0.11f - (0.06 * ((lane.left->value - LEFT_CENTER) / 100)));
+                lf_set_mode(Right);                
             }
-            if(isLeftCenter(lane.left->value) && isRightTurnLeft(lane.right->value)) {
-                lf_set_mode(mergeLeft1);
-            }
-            if(isLeftTurnRight(lane.left->value) && isRightCenter(lane.right->value)) {
-                lf_set_mode(mergeRight1);
-            }
-            if(lane.left->value == 0 && lane.right->value == 1920) {
+            // if(isLeftCenter(lane.left->value) && isRightTurnLeft(lane.right->value)) {
+            //     lf_set_mode(mergeLeft1);
+            // }
+            // if(isLeftTurnRight(lane.left->value) && isRightCenter(lane.right->value)) {
+            //     lf_set_mode(mergeRight1);
+            // }
+            if(lane.left->value == MIN && lane.right->value == MAX) {
+                lf_set(m.left_power, 0.0f);
+                lf_set(m.right_power, 0.0f);
                 lf_set_mode(Standby);
             }
         =}
@@ -187,19 +211,27 @@ main reactor {
     mode Right {
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Straight, Left, mergeLeft1, mergeRight1, Standby {= 
             printf("Entering Right\n");
-            if(isLeftCenter(lane.left->value) && isRightCenter(lane.right->value)) {
+            lf_set(m.left_power, 0.12f + (0.04 * ((lane.left->value - LEFT_CENTER) / 100)));
+            lf_set(m.right_power, 0.11f - (0.06 * ((lane.left->value - LEFT_CENTER) / 100)));
+            if(isRightCenter(lane.right->value)) {
+                lf_set(m.left_power, 0.16f);
+                lf_set(m.right_power, 0.15f);
                 lf_set_mode(Straight);
             } 
-            if(isLeftTurnLeft(lane.left->value) && isRightTurnLeft(lane.right->value)) {
+            if(lane.left->value == MIN) {
+                lf_set(m.left_power, 0.12f - (0.06 * ((RIGHT_CENTER - lane.right->value) / 100)));
+                lf_set(m.right_power, 0.11f + (0.04 * ((RIGHT_CENTER - lane.right->value) / 100)));
                 lf_set_mode(Left);
             }
-            if(isLeftCenter(lane.left->value) && isRightTurnLeft(lane.right->value)) {
-                lf_set_mode(mergeLeft1);
-            }
-            if(isLeftTurnRight(lane.left->value) && isRightCenter(lane.right->value)) {
-                lf_set_mode(mergeRight1);
-            }
-            if(lane.left->value == 0 && lane.right->value == 1920) {
+            // if(isLeftCenter(lane.left->value) && isRightTurnLeft(lane.right->value)) {
+            //     lf_set_mode(mergeLeft1);
+            // }
+            // if(isLeftTurnRight(lane.left->value) && isRightCenter(lane.right->value)) {
+            //     lf_set_mode(mergeRight1);
+            // }
+            if(lane.left->value == MIN && lane.right->value == MAX) {
+                lf_set(m.left_power, 0.0f);
+                lf_set(m.right_power, 0.0f);
                 lf_set_mode(Standby);
             }
         =}
