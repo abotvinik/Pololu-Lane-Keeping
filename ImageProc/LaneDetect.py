@@ -64,7 +64,7 @@ def cam_loop():
             send_to_uart(left, right)
         except KeyboardInterrupt:
             print("Camera Input Stopped")
-            send_to_uart(0, 640) # Signal for Pololu to move to "Ready State"
+            send_to_uart(0, 1000) # Signal for Pololu to move to "Ready State"
             break
 
 def image_file(filename):
