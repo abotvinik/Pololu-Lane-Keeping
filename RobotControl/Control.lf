@@ -32,7 +32,7 @@ preamble {=
     //Lane Value Defines
     #define LEFT_CENTER 83
     #define RIGHT_CENTER 553
-    #define THRESH 70
+    #define THRESH 40
     #define MIN 0
     #define MAX 640
 
@@ -118,25 +118,12 @@ main reactor {
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Standby, Straight, Left, Right {=
             printf("Entering Standby\n");
             printf("Lane Values %d %d\n", lane.left->value, lane.right->value);
-            if(lane.left->value != MIN || lane.right->value != MAX) {
+            if(lane.left->value != MIN || lane.right->value < MAX) {
                 sleep_ms(200);
                 lf_set(m.left_power, 0.16f);
                 lf_set(m.right_power, 0.15f);
                 lf_set_mode(Straight);
             }
-            // if(isLeftCenter(lane.left->value) && isRightCenter(lane.right->value)) {
-            //     lf_set(m.left_power, 0.16f);
-            //     lf_set(m.right_power, 0.15f);
-            //     lf_set_mode(Straight);
-            // } 
-            // if(isLeftTurnLeft(lane.left->value) && isRightTurnLeft(lane.right->value)) {
-            //     lf_set(m.left_power, 0.0f);
-            //     lf_set(m.right_power, 0.0f);
-            //     lf_set_mode(Standby);
-            // }
-            // if(isLeftTurnRight(lane.left->value) && isRightTurnRight(lane.right->value)) {
-            //     lf_set_mode(Standby);
-            // }
         =}
     }
 
@@ -178,7 +165,7 @@ main reactor {
                 lf_set_mode(mergeRight1);                
             }
 
-            if(lane.left->value == MIN && lane.right->value == MAX) {
+            if(lane.left->value == MIN && lane.right->value >= MAX) {
                 lf_set(m.left_power, 0.0f);
                 lf_set(m.right_power, 0.0f);
                 lf_set_mode(Standby);                
@@ -203,10 +190,10 @@ main reactor {
                 lf_set(m.right_power, 0.13f - (0.06 * ((power) / 100)));
                 lf_set_mode(Right);                
             }
-            if(lane.left->value == MIN && lane.right->value == MAX) {
+            if(lane.left->value == MIN && lane.right->value > MAX) {
                 lf_set(m.left_power, 0.0f);
                 lf_set(m.right_power, 0.0f);
-                lf_set_mode(Standby);
+                lf_set_mode(Standby);                
             }
         =}
     }
@@ -227,10 +214,10 @@ main reactor {
                 lf_set(m.right_power, 0.13f + (0.04 * ((power) / 100)));
                 lf_set_mode(Left);
             }
-            if(lane.left->value == MIN && lane.right->value == MAX) {
+            if(lane.left->value == MIN && lane.right->value > MAX) {
                 lf_set(m.left_power, 0.0f);
                 lf_set(m.right_power, 0.0f);
-                lf_set_mode(Standby);
+                lf_set_mode(Standby);                
             }
         =}
     }
@@ -238,7 +225,7 @@ main reactor {
     mode mergeLeft1 {
         reaction(poll) -> m.left_power, m.right_power, mergeLeft2 {=
             printf("Entering Merge Left 1\n");
-            sleep_ms(500);
+            sleep_ms(300);
             lf_set(m.left_power, 0.16f);
             lf_set(m.right_power, 0.15f);
             lf_set_mode(mergeLeft2);
@@ -246,13 +233,6 @@ main reactor {
     }
 
     mode mergeLeft2 {
-        //reaction(poll) -> m.left_power, m.right_power, mergeLeft3 {=
-        //    printf("Entering Merge Left 2\n");
-        //    sleep_ms(1500);
-        //    lf_set(m.left_power, 0.17f);
-        //    lf_set(m.right_power, 0.0f);
-        //    lf_set_mode(mergeLeft3);
-        //=}
         reaction(lane.left, lane.right) -> m.left_power, m.right_power, Right {=
             if(lane.right->value == MAX) {
                 int power = lane.left->value - LEFT_CENTER <= 100 ? lane.left->value - LEFT_CENTER : 100;
@@ -262,21 +242,11 @@ main reactor {
             }
         =}
     }
-    
-    mode mergeLeft3 {
-        reaction(poll) -> m.left_power, m.right_power, Standby, mergeFinish, tempStop {=
-            printf("Entering Merge Left 3\n");
-            sleep_ms(450);
-            lf_set(m.left_power, 0.16f);
-            lf_set(m.right_power, 0.15f);
-            lf_set_mode(mergeFinish);
-        =}
-    }
 
     mode mergeRight1 {
         reaction(poll) -> m.left_power, m.right_power, mergeRight2 {=
             printf("Entering Merge Left 1\n");
-            sleep_ms(500);
+            sleep_ms(300);
             lf_set(m.left_power, 0.16f);
             lf_set(m.right_power, 0.15f);
             lf_set_mode(mergeRight2);
@@ -284,38 +254,13 @@ main reactor {
     }
 
     mode mergeRight2 {
-        reaction(lane.left, lane.right) -> m.left_power, m.right_power, Left, mergeRight3 {=
+        reaction(lane.left, lane.right) -> m.left_power, m.right_power, Left {=
             printf("Entering Merge Left 2\n");
             if(lane.left->value == MIN) {
                 int power = RIGHT_CENTER - lane.right->value <= 100 ? RIGHT_CENTER - lane.right->value : 100;
                 lf_set(m.left_power, 0.14f - (0.06 * ((power) / 100)));
                 lf_set(m.right_power, 0.13f + (0.04 * ((power) / 100)));
                 lf_set_mode(Left);
-            }
-        =}
-    }
-    
-    mode mergeRight3 {
-        reaction(poll) -> m.left_power, m.right_power, Standby, Straight {=
-            printf("Entering Merge Left 3\n");
-            sleep_ms(450);
-            lf_set(m.left_power, 0.0f);
-            lf_set(m.right_power, 0.0f);
-            lf_set_mode(Standby);
-        =}
-    }
-
-    mode mergeFinish {
-        reaction(poll) -> Straight {=
-            sleep_ms(500);
-            lf_set_mode(Straight);
-        =}
-    }
-
-    mode tempStop {
-        reaction(lane.left, lane.right) -> Standby {=
-            if(lane.left->value == MIN && lane.right->value == MAX) {
-                lf_set_mode(Standby);
             }
         =}
     }
