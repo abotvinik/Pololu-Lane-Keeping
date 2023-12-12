@@ -64,7 +64,7 @@ def cam_loop():
             send_to_uart(left, right)
         except KeyboardInterrupt:
             print("Camera Input Stopped")
-            send_to_uart(0, 640) # Signal for Pololu to move to "Ready State"
+            send_to_uart(0, 1000) # Signal for Pololu to move to "Ready State"
             break
 
 def image_file(filename):
@@ -91,15 +91,18 @@ def image_processor(image):
     blur = cv2.GaussianBlur(grayscale, (kernel_size, kernel_size), 0)
     
     # first threshold for the hysteresis procedure
-    low_t = 50
+    low_t = 100
     # second threshold for the hysteresis procedure 
-    high_t = 200
+    high_t = 250
     # applying canny edge detection and save edges in a variable
-    edges = cv2.Canny(blur, low_t, high_t)
+    # edges = cv2.Canny(blur, low_t, high_t)
 
-    cv2.imwrite("edges.jpg", edges)
+    # Attempt Binary Edge Detection
+    _, binary = cv2.threshold(blur, 80, 255, cv2.THRESH_BINARY_INV)
     
-    region = edges
+    region = binary
+
+    cv2.imwrite("edges.jpg", region)
     
     return region
 
