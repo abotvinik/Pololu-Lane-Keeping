@@ -1,9 +1,7 @@
 import serial
-import numpy as np
 from picamera2 import Picamera2
 import time
 import cv2
-import sys
 
 lane = 380
 threshold = 10
@@ -80,24 +78,14 @@ def image_processor(image):
         image: image of a road where one wants to detect lane lines
         (we will be passing frames of video to this function)
     """
-    # convert the RGB image to Gray scale
+    # convert the RGB image to Grayscale
     grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # applying gaussian Blur which removes noise from the image 
-    # and focuses on our region of interest
-    # size of gaussian kernel
+    # Applies Gaussian Blur to the image to reduce noise for future processing
     kernel_size = 5
-    # Applying gaussian blur to remove noise from the frames
     blur = cv2.GaussianBlur(grayscale, (kernel_size, kernel_size), 0)
-    
-    # first threshold for the hysteresis procedure
-    low_t = 100
-    # second threshold for the hysteresis procedure 
-    high_t = 250
-    # applying canny edge detection and save edges in a variable
-    # edges = cv2.Canny(blur, low_t, high_t)
 
-    # Attempt Binary Edge Detection
+    # Binary Edge Detection
     _, binary = cv2.threshold(blur, 80, 255, cv2.THRESH_BINARY_INV)
     
     region = binary
@@ -140,7 +128,7 @@ if __name__ == '__main__':
     # left, right = lr_detector(image_file('./edges.jpg'))
     # time.sleep(1)
 
-    #single_cam()
+    # single_cam()
 
     cam_loop()
     ser.close()

@@ -9,9 +9,6 @@ target C {
 import Motors from "../lib/Motors.lf"
 import Display from "../lib/Display.lf"
 import lanesFromInt from "../lib/lanesFromInt.lf"
-//import Encoders from "../lib/Encoders.lf"
-//import GyroAngle from "../lib/IMU.lf"
-//import Accelerometer from "../lib/IMU.lf"
 
 preamble {=
     #include <pico/stdlib.h>
@@ -43,20 +40,11 @@ preamble {=
     static int isRightCenter(int right) {
         return right <= RIGHT_CENTER + THRESH && right >= RIGHT_CENTER - THRESH;
     }
-    static int isLeftTurnLeft(int left) {
-        return left < LEFT_CENTER - THRESH;
-    }
     static int isRightTurnLeft(int right) {
         return right < RIGHT_CENTER - THRESH;
     }
     static int isLeftTurnRight(int left) {
         return left > LEFT_CENTER + THRESH;
-    }
-    static int isRightTurnRight(int right) {
-        return right > RIGHT_CENTER + THRESH;
-    }
-    static int LeftMerge(int left, int right) {
-        return right <= RIGHT_CENTER - THRESH; 
     }
 
  =}
@@ -68,6 +56,7 @@ main reactor {
     timer uart_poll(0, 100 ms)
     timer poll(0, 10 ms)
 
+    //Setup
     reaction(startup) -> lane.encodedLanes, d.line3 {=
         static char buf[17];
         snprintf(buf, 17, "Enter Setup");
@@ -90,6 +79,7 @@ main reactor {
         lf_set(d.line3, buf);
     =}
 
+    //Poll for UART Input
     reaction(uart_poll) -> lane.encodedLanes {=
         char buffer[20];
         int i = 0;
@@ -115,7 +105,7 @@ main reactor {
     =}
 
     initial mode Standby {
-        reaction(lane.left, lane.right) -> m.left_power, m.right_power, Standby, Straight, Left, Right {=
+        reaction(lane.left, lane.right) -> m.left_power, m.right_power, Straight{=
             printf("Entering Standby\n");
             printf("Lane Values %d %d\n", lane.left->value, lane.right->value);
             if(lane.left->value != MIN || lane.right->value < MAX) {
@@ -165,6 +155,7 @@ main reactor {
                 lf_set_mode(mergeRight1);                
             }
 
+            // Standby
             if(lane.left->value == MIN && lane.right->value >= MAX) {
                 lf_set(m.left_power, 0.0f);
                 lf_set(m.right_power, 0.0f);
